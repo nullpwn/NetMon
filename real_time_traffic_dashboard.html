@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-Time Traffic Analysis Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        /* Global Styles */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f3f7f9;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        h1 {
+            color: #2c3e50;
+            margin-top: 20px;
+            font-size: 2.5em;
+            font-weight: 600;
+        }
+
+        h2 {
+            color: #34495e;
+            margin: 20px 0;
+            font-size: 1.8em;
+            text-align: center;
+        }
+
+        .filter-container {
+            background-color: #ffffff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            width: 80%;
+            max-width: 800px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .filter-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: space-between;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            min-width: 240px;
+            max-width: 380px;
+        }
+
+        label {
+            font-size: 16px;
+            color: #34495e;
+            font-weight: 500;
+            margin-bottom: 5px;
+        }
+
+        select, input {
+            padding: 12px;
+            font-size: 16px;
+            border: 1px solid #bdc3c7;
+            border-radius: 5px;
+            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        select:focus, input:focus {
+            border-color: #3498db;
+            outline: none;
+            box-shadow: 0px 4px 12px rgba(52, 152, 219, 0.4);
+        }
+
+        select {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="%233498db" d="M7 10l5 5 5-5z"/></svg>') no-repeat right 10px center;
+            background-color: white;
+        }
+
+        select::-ms-expand {
+            display: none;
+        }
+
+        table {
+            width: 80%;
+            margin: 20px auto;
+            border-collapse: collapse;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            background-color: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        th, td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid #ecf0f1;
+            color: #2c3e50;
+        }
+
+        th {
+            background-color: #2980b9;
+            color: white;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        table tr {
+            background-color: #ffffff;
+            color: #2c3e50;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        table tr:hover {
+            background-color: #3498db;
+            color: #ffffff;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+
+        .protocol-http {
+            color: #2980b9;
+        }
+
+        .protocol-https {
+            color: #27ae60;
+        }
+
+        .protocol-mdns {
+            color: #e67e22;
+        }
+
+        .protocol-udp {
+            color: #9b59b6;
+        }
+
+        .protocol-tcp {
+            color: #e74c3c;
+        }
+
+        .chart-container {
+            width: 80%;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #ffffff;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+        }
+
+        .side-by-side-container {
+            display: flex;
+            justify-content: space-between;
+            width: 80%;
+            max-width: 800px;
+            margin: 20px auto;
+            gap: 20px;
+        }
+
+        .small-chart-container, .medium-chart-container {
+            background-color: #ffffff;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+            padding: 10px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .small-chart-container {
+            max-width: 350px;
+            height: 350px;
+        }
+
+        .medium-chart-container {
+            flex-grow: 2;
+            padding: 20px;
+        }
+
+        #trafficChart, #protocolChart, #packetCountChart, #cpuUsageChart, #ramUsageChart {
+            max-width: 100%;
+        }
+
+        #protocolChart {
+            width: 100%;
+            height: 100%;
+            max-width: 350px;
+            max-height: 350px;
+        }
+
+        #packetDetailsModal {
+            display: none;
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
+        }
+
+        #packetDetailsContent {
+            background-color: #fefefe;
+            margin: 10% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            box-shadow: 0px 8px 16px rgba(0, 0, 0, 0.2);
+        }
+
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+
+        .close:hover,
+        .close:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        /* Dark Mode Styles */
+        body.dark-mode {
+            background-color: #2c3e50;
+            color: #ecf0f1;
+        }
+
+        body.dark-mode h1,
+        body.dark-mode h2 {
+            color: #ecf0f1;
+        }
+
+        body.dark-mode .filter-container,
+        body.dark-mode .chart-container,
+        body.dark-mode .small-chart-container,
+        body.dark-mode .medium-chart-container {
+            background-color: #34495e;
+            box-shadow: none;
+        }
+
+        body.dark-mode table {
+            background-color: #34495e;
+            border-color: #34495e;
+        }
+
+        body.dark-mode th {
+            background-color: #2c3e50;
+            color: #ecf0f1;
+        }
+
+        body.dark-mode td {
+            color: #ecf0f1;
+            border-color: #3b4a54;
+        }
+
+        body.dark-mode tr:nth-child(even) {
+            background-color: #3b4a54;
+        }
+
+        body.dark-mode tr {
+            background-color: #34495e;
+            color: #ecf0f1;
+        }
+
+        body.dark-mode tr:hover {
+            background-color: #2980b9;
+            color: #ffffff;
+        }
+
+        body.dark-mode #packetDetailsContent {
+            background-color: #2c3e50;
+            color: #ecf0f1;
+            border: 1px solid #888;
+        }
+
+        body.dark-mode #packetDetailsContent pre {
+            color: #ecf0f1;
+        }
+
+        body.dark-mode .close {
+            color: #ecf0f1;
+        }
+
+        body.dark-mode .close:hover,
+        body.dark-mode .close:focus {
+            color: #ecf0f1;
+        }
+
+        /* Stylish Dark Mode Toggle with Sun and Moon Icons */
+        .dark-mode-toggle {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 60px;
+            height: 30px;
+            background: linear-gradient(45deg, #f39c12, #f1c40f);
+            border-radius: 30px;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+            padding: 5px;
+            transition: background 0.5s ease;
+            justify-content: flex-start;
+        }
+
+        .dark-mode-toggle.active {
+            background: linear-gradient(45deg, #34495e, #2c3e50);
+            justify-content: flex-end;
+        }
+
+        .dark-mode-toggle i {
+            color: white;
+            font-size: 1.2em;
+            transition: transform 0.3s ease, opacity 0.3s ease;
+            position: absolute;
+        }
+
+        .dark-mode-toggle i.fa-moon {
+            opacity: 0;
+        }
+
+        .dark-mode-toggle.active i.fa-moon {
+            opacity: 1;
+            transform: translateX(-30px);
+        }
+
+        .dark-mode-toggle.active i.fa-sun {
+            opacity: 0;
+            transform: translateX(-30px);
+        }
+
+        /* Export Buttons Styling */
+        .export-buttons {
+            display: flex;
+            justify-content: flex-end;
+            margin: 20px;
+        }
+
+        .export-buttons button {
+            background-color: #2980b9;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin-left: 10px;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .export-buttons button:hover {
+            background-color: #3498db;
+        }
+
+        .export-buttons button i {
+            margin-right: 5px;
+        }
+
+        /* Toast Notification */
+        #toast {
+            visibility: hidden;
+            min-width: 250px;
+            margin-left: -125px;
+            background-color: #333;
+            color: #fff;
+            text-align: center;
+            border-radius: 5px;
+            padding: 16px;
+            position: fixed;
+            z-index: 1;
+            left: 50%;
+            bottom: 30px;
+            font-size: 17px;
+        }
+
+        #toast.show {
+            visibility: visible;
+            -webkit-animation: fadein 0.5s, fadeout 0.5s 2.5s;
+            animation: fadein 0.5s, fadeout 0.5s 2.5s;
+        }
+
+        @-webkit-keyframes fadein {
+            from {bottom: 0; opacity: 0;} 
+            to {bottom: 30px; opacity: 1;}
+        }
+
+        @keyframes fadein {
+            from {bottom: 0; opacity: 0;}
+            to {bottom: 30px; opacity: 1;}
+        }
+
+        @-webkit-keyframes fadeout {
+            from {bottom: 30px; opacity: 1;} 
+            to {bottom: 0; opacity: 0;}
+        }
+
+        @keyframes fadeout {
+            from {bottom: 30px; opacity: 1;}
+            to {bottom: 0; opacity: 0;}
+        }
+
+    </style>
+</head>
+<body>
+    <h1>Real-Time Traffic Analysis Dashboard</h1>
+
+    <!-- Stylish Dark Mode Toggle with Sun and Moon -->
+    <div class="dark-mode-toggle" id="darkModeToggle">
+        <i class="fas fa-sun"></i>
+        <i class="fas fa-moon"></i>
+    </div>
+
+    <div class="filter-container">
+        <div class="filter-row">
+            <div class="filter-group">
+                <label for="protocolFilter">Filter by Protocol:</label>
+                <select id="protocolFilter">
+                    <option value="All">All Protocols</option>
+                    <option value="HTTP">HTTP</option>
+                    <option value="HTTPS">HTTPS</option>
+                    <option value="mDNS">mDNS</option>
+                    <option value="UDP">UDP</option>
+                    <option value="TCP">TCP</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label for="ipVersionFilter">Filter by IP Version:</label>
+                <select id="ipVersionFilter">
+                    <option value="All">All IPs</option>
+                    <option value="IPv4">IPv4</option>
+                    <option value="IPv6">IPv6</option>
+                </select>
+            </div>
+        </div>
+        <div class="filter-row">
+            <div class="filter-group">
+                <label for="sourceIP">Source IP:</label>
+                <input type="text" id="sourceIP" placeholder="e.g., 192.168.1.1">
+            </div>
+            <div class="filter-group">
+                <label for="destinationIP">Destination IP:</label>
+                <input type="text" id="destinationIP" placeholder="e.g., 8.8.8.8">
+            </div>
+        </div>
+        <div class="filter-row">
+            <div class="filter-group">
+                <label for="searchInput">Search:</label>
+                <input type="text" id="searchInput" placeholder="Search...">
+            </div>
+        </div>
+    </div>
+
+    <div id="trafficChartContainer" class="chart-container connectedSortable">
+        <h2>Packet Length Over Time</h2>
+        <canvas id="trafficChart"></canvas>
+    </div>
+
+    <div class="side-by-side-container">
+        <div id="protocolChartContainer" class="small-chart-container connectedSortable">
+            <h2>Protocol Distribution</h2>
+            <canvas id="protocolChart"></canvas>
+        </div>
+        <div id="packetCountChartContainer" class="medium-chart-container connectedSortable">
+            <h2>Packet Count Over Time</h2>
+            <canvas id="packetCountChart"></canvas>
+        </div>
+    </div>
+
+    <!-- System Usage Charts -->
+    <div class="side-by-side-container">
+        <div id="cpuUsageContainer" class="small-chart-container connectedSortable">
+            <h2>CPU Usage</h2>
+            <canvas id="cpuUsageChart"></canvas>
+        </div>
+        <div id="ramUsageContainer" class="small-chart-container connectedSortable">
+            <h2>RAM Usage</h2>
+            <canvas id="ramUsageChart"></canvas>
+        </div>
+    </div>
+
+    <h2>Traffic Data</h2>
+
+    <!-- Export buttons above the table -->
+    <div class="export-buttons">
+        <button onclick="downloadCSV()">
+            <i class="fas fa-file-csv"></i> Download CSV
+        </button>
+    </div>
+
+    <table id="trafficTable">
+        <thead>
+            <tr>
+                <th>No.</th>
+                <th>Time</th>
+                <th>Source IP</th>
+                <th>Destination IP</th>
+                <th>Protocol</th>
+                <th>Length</th>
+                <th>Info</th>
+                <th>Detailed Info</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Table rows will be populated by JavaScript -->
+        </tbody>
+    </table>
+
+    <!-- Modal for detailed packet information -->
+    <div id="packetDetailsModal">
+        <div id="packetDetailsContent">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <h3>Packet Details</h3>
+            <pre id="packetDetails"></pre>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast">File exported successfully!</div>
+
+    <script>
+        const trafficCtx = document.getElementById('trafficChart').getContext('2d');
+        const protocolCtx = document.getElementById('protocolChart').getContext('2d');
+        const packetCountCtx = document.getElementById('packetCountChart').getContext('2d');
+        const cpuCtx = document.getElementById('cpuUsageChart').getContext('2d');
+        const ramCtx = document.getElementById('ramUsageChart').getContext('2d');
+
+        // Initialize charts
+        const trafficChart = new Chart(trafficCtx, {
+            type: 'line',
+            data: { labels: [], datasets: [{ label: 'Packet Length', data: [], borderColor: 'rgba(75, 192, 192, 1)', borderWidth: 2, fill: false }] },
+            options: { responsive: true, scales: { x: { title: { display: true, text: 'Packet Index' } }, y: { title: { display: true, text: 'Packet Length (Bytes)' }, beginAtZero: true } } }
+        });
+
+        const protocolChart = new Chart(protocolCtx, {
+            type: 'pie',
+            data: { labels: ['HTTP', 'HTTPS', 'mDNS', 'UDP', 'TCP'], datasets: [{ label: 'Protocol Distribution', data: [0, 0, 0, 0, 0], backgroundColor: ['#3498db', '#2ecc71', '#e67e22', '#9b59b6', '#e74c3c'] }] },
+            options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10, color: getComputedStyle(document.body).getPropertyValue('--legend-color') } } } } }
+        });
+
+        const packetCountChart = new Chart(packetCountCtx, {
+            type: 'line',
+            data: { labels: [], datasets: [{ label: 'Packet Count', data: [], borderColor: 'rgba(255, 99, 132, 1)', borderWidth: 2, fill: false }] },
+            options: { responsive: true, scales: { x: { title: { display: true, text: 'Time (s)' } }, y: { title: { display: true, text: 'Packet Count' }, beginAtZero: true } } }
+        });
+
+        const cpuUsageChart = new Chart(cpuCtx, {
+            type: 'line',
+            data: { labels: [], datasets: [{ label: 'CPU Usage (%)', data: [], borderColor: 'rgba(255, 159, 64, 1)', borderWidth: 2, fill: false }] },
+            options: { responsive: true, scales: { x: { title: { display: true, text: 'Time' } }, y: { title: { display: true, text: 'CPU Usage (%)' }, beginAtZero: true, max: 100 } } }
+        });
+
+        const ramUsageChart = new Chart(ramCtx, {
+            type: 'line',
+            data: { labels: [], datasets: [{ label: 'RAM Usage (%)', data: [], borderColor: 'rgba(153, 102, 255, 1)', borderWidth: 2, fill: false }] },
+            options: { responsive: true, scales: { x: { title: { display: true, text: 'Time' } }, y: { title: { display: true, text: 'RAM Usage (%)' }, beginAtZero: true, max: 100 } } }
+        });
+
+        const protocolFilter = document.getElementById('protocolFilter');
+        const ipVersionFilter = document.getElementById('ipVersionFilter');
+        const sourceIPFilter = document.getElementById('sourceIP');
+        const destinationIPFilter = document.getElementById('destinationIP');
+        const searchInput = document.getElementById('searchInput');
+
+        async function updateChartsAndTable() {
+            try {
+                const response = await fetch('http://localhost:5000/traffic');
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const data = await response.json();
+
+                const protocolData = { 'HTTP': 0, 'HTTPS': 0, 'mDNS': 0, 'UDP': 0, 'TCP': 0 };
+                const packetCount = data.length;
+
+                trafficChart.data.labels = [];
+                trafficChart.data.datasets[0].data = [];
+
+                const tableBody = document.querySelector('#trafficTable tbody');
+                tableBody.innerHTML = '';
+
+                const filteredData = data.slice(-500); // Only process the last 500 packets
+
+                filteredData.forEach((packet, index) => {
+                    if (protocolFilter.value !== 'All' && packet.Protocol !== protocolFilter.value) return;
+                    if (ipVersionFilter.value === 'IPv4' && packet.Source.includes(':')) return;
+                    if (ipVersionFilter.value === 'IPv6' && !packet.Source.includes(':')) return;
+                    if (sourceIPFilter.value.trim() && packet.Source !== sourceIPFilter.value.trim()) return;
+                    if (destinationIPFilter.value.trim() && packet.Destination !== destinationIPFilter.value.trim()) return;
+                    const combinedData = `${packet.Source} ${packet.Destination} ${packet.Protocol} ${packet.Length} ${packet['Detailed Info']}`.toLowerCase();
+                    if (searchInput.value.trim() && !combinedData.includes(searchInput.value.toLowerCase().trim())) return;
+
+                    protocolData[packet.Protocol]++;
+
+                    trafficChart.data.labels.push(index);
+                    trafficChart.data.datasets[0].data.push(packet.Length);
+
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${packet['No.']}</td>
+                        <td>${new Date(packet.Time).toLocaleTimeString()}</td>
+                        <td>${packet.Source}</td>
+                        <td>${packet.Destination}</td>
+                        <td class="protocol-${packet.Protocol.toLowerCase()}">${packet.Protocol}</td>
+                        <td>${packet.Length}</td>
+                        <td>${packet.Info}</td>
+                        <td>${packet['Detailed Info']}</td>
+                    `;
+                    row.addEventListener('click', () => showPacketDetails(packet));
+                    tableBody.appendChild(row);
+                });
+
+                protocolChart.data.datasets[0].data = Object.values(protocolData);
+                packetCountChart.data.labels.push(packetCountChart.data.labels.length);
+                packetCountChart.data.datasets[0].data.push(packetCount);
+
+                trafficChart.update();
+                protocolChart.update();
+                packetCountChart.update();
+            } catch (error) {
+                console.error('Error fetching traffic data:', error);
+            }
+        }
+
+        async function updateSystemUsageCharts() {
+            try {
+                const response = await fetch('http://localhost:5000/system-usage');
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const data = await response.json();
+                const currentTime = new Date().toLocaleTimeString();
+
+                if (cpuUsageChart.data.labels.length >= 20) {
+                    cpuUsageChart.data.labels.shift();
+                    cpuUsageChart.data.datasets[0].data.shift();
+                }
+                cpuUsageChart.data.labels.push(currentTime);
+                cpuUsageChart.data.datasets[0].data.push(data.cpu_usage);
+                cpuUsageChart.update();
+
+                if (ramUsageChart.data.labels.length >= 20) {
+                    ramUsageChart.data.labels.shift();
+                    ramUsageChart.data.datasets[0].data.shift();
+                }
+                ramUsageChart.data.labels.push(currentTime);
+                ramUsageChart.data.datasets[0].data.push(data.memory_usage);
+                ramUsageChart.update();
+            } catch (error) {
+                console.error('Error fetching system usage data:', error);
+            }
+        }
+
+        // Toast notification
+        function showToast(message, isError = false) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.style.backgroundColor = isError ? '#e74c3c' : '#333';
+            toast.className = 'show';
+            setTimeout(() => {
+                toast.className = toast.className.replace('show', '');
+            }, 3000);
+        }
+
+        // Download CSV function with improved error handling
+        function downloadCSV() {
+            fetch('http://localhost:5000/export/csv')
+                .then(response => {
+                    if (!response.ok) throw new Error(`Failed to download CSV file: ${response.statusText}`);
+                    return response.blob();
+                })
+                .then(blob => {
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'traffic_data.csv';
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    showToast('CSV file exported successfully!');
+                })
+                .catch(error => {
+                    console.error('Error downloading CSV:', error);
+                    showToast('Error exporting CSV file.', true);
+                });
+        }
+
+        function showPacketDetails(packet) {
+            const detailedInfo = JSON.stringify({
+                'No.': packet['No.'],
+                'Time': new Date(packet.Time).toLocaleString(),
+                'Source IP': packet.Source,
+                'Destination IP': packet.Destination,
+                'Protocol': packet.Protocol,
+                'Length': packet.Length,
+                'Info': packet.Info,
+                'Detailed Info': packet['Detailed Info']
+            }, null, 2);
+
+            document.getElementById('packetDetails').textContent = detailedInfo;
+            document.getElementById('packetDetailsModal').style.display = 'block';
+        }
+
+        function closeModal() {
+            document.getElementById('packetDetailsModal').style.display = 'none';
+        }
+
+        // Throttled chart and table updates
+        setInterval(() => {
+            updateChartsAndTable();
+        }, 1000);
+
+        // Poll system usage every 2 seconds
+        setInterval(updateSystemUsageCharts, 2000);
+
+        // Dark Mode Toggle Logic
+        document.getElementById('darkModeToggle').addEventListener('click', function () {
+            document.body.classList.toggle('dark-mode');
+            const toggleButton = document.getElementById('darkModeToggle');
+
+            if (document.body.classList.contains('dark-mode')) {
+                toggleButton.classList.add('active');
+                localStorage.setItem('darkMode', 'enabled');
+            } else {
+                toggleButton.classList.remove('active');
+                localStorage.setItem('darkMode', 'disabled');
+            }
+
+            updateLegendColor();
+        });
+
+        if (localStorage.getItem('darkMode') === 'enabled') {
+            document.body.classList.add('dark-mode');
+            document.getElementById('darkModeToggle').classList.add('active');
+        }
+
+        function updateLegendColor() {
+            const color = document.body.classList.contains('dark-mode') ? '#ecf0f1' : '#34495e';
+            document.documentElement.style.setProperty('--legend-color', color);
+            protocolChart.options.plugins.legend.labels.color = color;
+            protocolChart.update();
+        }
+
+        updateLegendColor();
+
+        // Draggable and Sortable Layout Logic
+        $(function() {
+            $(".chart-container, .side-by-side-container").sortable({
+                connectWith: ".connectedSortable",
+                handle: ".handle",
+                placeholder: "ui-state-highlight",
+                stop: function(event, ui) {
+                    let order = $(".chart-container, .side-by-side-container").sortable("toArray");
+                    localStorage.setItem("dashboardOrder", JSON.stringify(order));
+                }
+            }).disableSelection();
+
+            let savedOrder = localStorage.getItem("dashboardOrder");
+            if (savedOrder) {
+                savedOrder = JSON.parse(savedOrder);
+                for (let id of savedOrder) {
+                    $("#" + id).appendTo($(".chart-container, .side-by-side-container"));
+                }
+            }
+        });
+    </script>
+</body>
+</html>
