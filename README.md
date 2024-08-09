@@ -4,29 +4,21 @@ This repository contains a Python-based network traffic sniffer and a web-based 
 
 ## Table of Contents
 
-- [Overview](#overview)
-- [Features](#features)
-- [Installation](#installation)
-  - [Prerequisites](#prerequisites)
-  - [Python Package Installation](#python-package-installation)
-  - [JavaScript Libraries](#javascript-libraries)
-- [Usage](#usage)
-  - [Running the Traffic Sniffer](#running-the-traffic-sniffer)
-  - [Accessing the Dashboard](#accessing-the-dashboard)
-  - [Using the Dashboard](#using-the-dashboard)
-    - [Filtering Traffic Data](#filtering-traffic-data)
-    - [Exporting Data](#exporting-data)
-  - [Stopping the Sniffer](#stopping-the-sniffer)
+- [Real-Time Traffic Analysis Dashboard](#real-time-traffic-analysis-dashboard)
+  - [Table of Contents](#table-of-contents)
+  - [Overview](#overview)
+  - [Features](#features)
+  - [Installation](#installation)
+    - [Prerequisites](#prerequisites)
+    - [Python Package Installation](#python-package-installation)
+  - [Usage](#usage)
+    - [Running the Traffic Sniffer](#running-the-traffic-sniffer)
+    - [Accessing the Dashboard](#accessing-the-dashboard)
+    - [Using the Dashboard](#using-the-dashboard)
+      - [Filtering Traffic Data](#filtering-traffic-data)
+      - [Exporting Data](#exporting-data)
+      - [Stopping the Sniffer](#stopping-the-sniffer)
   - [Troubleshooting](#troubleshooting)
-  - [Example](#example)
-  - [Advanced Usage](#advanced-usage)
-- [Development](#development)
-  - [File Structure](#file-structure)
-  - [Adding New Features](#adding-new-features)
-  - [Testing](#testing)
-- [Contributing](#contributing)
-- [License](#license)
-- [Acknowledgements](#acknowledgements)
 
 ## Overview
 
@@ -54,3 +46,36 @@ To run the traffic sniffer and serve the dashboard, you'll need to install the r
 
 ```bash
 pip install scapy Flask psutil
+```
+
+## Usage
+
+### Running the Traffic Sniffer
+
+To start the traffic sniffer, run the following command:
+
+```bash
+python perimica_traffic_sniffer.py
+```
+
+### Accessing the Dashboard
+
+After starting the sniffer, you can access the dashboard by opening `real_time_traffic_dashboard.html` in a web browser.
+
+### Using the Dashboard
+
+#### Filtering Traffic Data
+
+You can filter the traffic data by protocol, IP version, source IP, and destination IP using the provided filter options on the dashboard.
+
+#### Exporting Data
+
+To export the traffic data as a CSV file, click the "Download CSV" button on the dashboard.
+
+#### Stopping the Sniffer
+
+To stop the sniffer, press `Ctrl+C` in the terminal where the sniffer is running.
+
+## Troubleshooting
+
+If you encounter issues, ensure that all required Python packages are installed and that your network interface is correctly specified in the sniffer script.
