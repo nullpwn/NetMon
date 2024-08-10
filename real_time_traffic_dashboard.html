@@ -1,12 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Real-Time Traffic Analysis Dashboard</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
         /* Global Styles */
@@ -70,7 +68,8 @@
             margin-bottom: 5px;
         }
 
-        select, input {
+        select,
+        input {
             padding: 12px;
             font-size: 16px;
             border: 1px solid #bdc3c7;
@@ -81,7 +80,8 @@
             box-sizing: border-box;
         }
 
-        select:focus, input:focus {
+        select:focus,
+        input:focus {
             border-color: #3498db;
             outline: none;
             box-shadow: 0px 4px 12px rgba(52, 152, 219, 0.4);
@@ -109,7 +109,8 @@
             overflow: hidden;
         }
 
-        th, td {
+        th,
+        td {
             padding: 15px;
             text-align: left;
             border-bottom: 1px solid #ecf0f1;
@@ -177,7 +178,8 @@
             gap: 20px;
         }
 
-        .small-chart-container, .medium-chart-container {
+        .small-chart-container,
+        .medium-chart-container {
             background-color: #ffffff;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
             border-radius: 8px;
@@ -198,7 +200,11 @@
             padding: 20px;
         }
 
-        #trafficChart, #protocolChart, #packetCountChart, #cpuUsageChart, #ramUsageChart {
+        #trafficChart,
+        #protocolChart,
+        #packetCountChart,
+        #cpuUsageChart,
+        #ramUsageChart {
             max-width: 100%;
         }
 
@@ -218,7 +224,7 @@
             width: 100%;
             height: 100%;
             overflow: auto;
-            background-color: rgba(0,0,0,0.4);
+            background-color: rgba(0, 0, 0, 0.4);
         }
 
         #packetDetailsContent {
@@ -406,27 +412,55 @@
         }
 
         @-webkit-keyframes fadein {
-            from {bottom: 0; opacity: 0;} 
-            to {bottom: 30px; opacity: 1;}
+            from {
+                bottom: 0;
+                opacity: 0;
+            }
+
+            to {
+                bottom: 30px;
+                opacity: 1;
+            }
         }
 
         @keyframes fadein {
-            from {bottom: 0; opacity: 0;}
-            to {bottom: 30px; opacity: 1;}
+            from {
+                bottom: 0;
+                opacity: 0;
+            }
+
+            to {
+                bottom: 30px;
+                opacity: 1;
+            }
         }
 
         @-webkit-keyframes fadeout {
-            from {bottom: 30px; opacity: 1;} 
-            to {bottom: 0; opacity: 0;}
+            from {
+                bottom: 30px;
+                opacity: 1;
+            }
+
+            to {
+                bottom: 0;
+                opacity: 0;
+            }
         }
 
         @keyframes fadeout {
-            from {bottom: 30px; opacity: 1;}
-            to {bottom: 0; opacity: 0;}
-        }
+            from {
+                bottom: 30px;
+                opacity: 1;
+            }
 
+            to {
+                bottom: 0;
+                opacity: 0;
+            }
+        }
     </style>
 </head>
+
 <body>
     <h1>Real-Time Traffic Analysis Dashboard</h1>
 
@@ -543,7 +577,14 @@
     <!-- Toast Notification -->
     <div id="toast">File exported successfully!</div>
 
+    <!-- JavaScript Imports -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
+
+    <!-- Custom JavaScript -->
     <script>
+        // Global Variables
         const trafficCtx = document.getElementById('trafficChart').getContext('2d');
         const protocolCtx = document.getElementById('protocolChart').getContext('2d');
         const packetCountCtx = document.getElementById('packetCountChart').getContext('2d');
@@ -553,32 +594,160 @@
         // Initialize charts
         const trafficChart = new Chart(trafficCtx, {
             type: 'line',
-            data: { labels: [], datasets: [{ label: 'Packet Length', data: [], borderColor: 'rgba(75, 192, 192, 1)', borderWidth: 2, fill: false }] },
-            options: { responsive: true, scales: { x: { title: { display: true, text: 'Packet Index' } }, y: { title: { display: true, text: 'Packet Length (Bytes)' }, beginAtZero: true } } }
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Packet Length',
+                    data: [],
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    borderWidth: 2,
+                    fill: false
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Packet Index'
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Packet Length (Bytes)'
+                        },
+                        beginAtZero: true
+                    }
+                }
+            }
         });
 
         const protocolChart = new Chart(protocolCtx, {
             type: 'pie',
-            data: { labels: ['HTTP', 'HTTPS', 'mDNS', 'UDP', 'TCP'], datasets: [{ label: 'Protocol Distribution', data: [0, 0, 0, 0, 0], backgroundColor: ['#3498db', '#2ecc71', '#e67e22', '#9b59b6', '#e74c3c'] }] },
-            options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10, color: getComputedStyle(document.body).getPropertyValue('--legend-color') } } } } }
+            data: {
+                labels: ['HTTP', 'HTTPS', 'mDNS', 'UDP', 'TCP'],
+                datasets: [{
+                    label: 'Protocol Distribution',
+                    data: [0, 0, 0, 0, 0],
+                    backgroundColor: ['#3498db', '#2ecc71', '#e67e22', '#9b59b6', '#e74c3c']
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            boxWidth: 10,
+                            font: {
+                                size: 10,
+                                color: getComputedStyle(document.body).getPropertyValue('--legend-color')
+                            }
+                        }
+                    }
+                }
+            }
         });
 
         const packetCountChart = new Chart(packetCountCtx, {
             type: 'line',
-            data: { labels: [], datasets: [{ label: 'Packet Count', data: [], borderColor: 'rgba(255, 99, 132, 1)', borderWidth: 2, fill: false }] },
-            options: { responsive: true, scales: { x: { title: { display: true, text: 'Time (s)' } }, y: { title: { display: true, text: 'Packet Count' }, beginAtZero: true } } }
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Packet Count',
+                    data: [],
+                    borderColor: 'rgba(255, 99, 132, 1)',
+                    borderWidth: 2,
+                    fill: false
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Time (s)'
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Packet Count'
+                        },
+                        beginAtZero: true
+                    }
+                }
+            }
         });
 
         const cpuUsageChart = new Chart(cpuCtx, {
             type: 'line',
-            data: { labels: [], datasets: [{ label: 'CPU Usage (%)', data: [], borderColor: 'rgba(255, 159, 64, 1)', borderWidth: 2, fill: false }] },
-            options: { responsive: true, scales: { x: { title: { display: true, text: 'Time' } }, y: { title: { display: true, text: 'CPU Usage (%)' }, beginAtZero: true, max: 100 } } }
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'CPU Usage (%)',
+                    data: [],
+                    borderColor: 'rgba(255, 159, 64, 1)',
+                    borderWidth: 2,
+                    fill: false
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Time'
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'CPU Usage (%)'
+                        },
+                        beginAtZero: true,
+                        max: 100
+                    }
+                }
+            }
         });
 
         const ramUsageChart = new Chart(ramCtx, {
             type: 'line',
-            data: { labels: [], datasets: [{ label: 'RAM Usage (%)', data: [], borderColor: 'rgba(153, 102, 255, 1)', borderWidth: 2, fill: false }] },
-            options: { responsive: true, scales: { x: { title: { display: true, text: 'Time' } }, y: { title: { display: true, text: 'RAM Usage (%)' }, beginAtZero: true, max: 100 } } }
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'RAM Usage (%)',
+                    data: [],
+                    borderColor: 'rgba(153, 102, 255, 1)',
+                    borderWidth: 2,
+                    fill: false
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Time'
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'RAM Usage (%)'
+                        },
+                        beginAtZero: true,
+                        max: 100
+                    }
+                }
+            }
         });
 
         const protocolFilter = document.getElementById('protocolFilter');
@@ -587,6 +756,7 @@
         const destinationIPFilter = document.getElementById('destinationIP');
         const searchInput = document.getElementById('searchInput');
 
+        // Update charts and table with throttling
         async function updateChartsAndTable() {
             try {
                 const response = await fetch('http://localhost:5000/traffic');
@@ -645,6 +815,7 @@
             }
         }
 
+        // Update system usage charts
         async function updateSystemUsageCharts() {
             try {
                 const response = await fetch('http://localhost:5000/system-usage');
@@ -765,12 +936,12 @@
         updateLegendColor();
 
         // Draggable and Sortable Layout Logic
-        $(function() {
+        $(function () {
             $(".chart-container, .side-by-side-container").sortable({
                 connectWith: ".connectedSortable",
                 handle: ".handle",
                 placeholder: "ui-state-highlight",
-                stop: function(event, ui) {
+                stop: function (event, ui) {
                     let order = $(".chart-container, .side-by-side-container").sortable("toArray");
                     localStorage.setItem("dashboardOrder", JSON.stringify(order));
                 }
@@ -786,4 +957,5 @@
         });
     </script>
 </body>
+
 </html>
