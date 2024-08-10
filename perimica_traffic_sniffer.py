@@ -1,5 +1,3 @@
-from flask import Flask, jsonify, Response, make_response
-from flask_cors import CORS
 import threading
 import csv
 import logging
@@ -7,12 +5,18 @@ import pyshark
 import io
 import psutil
 import time
+from flask import Flask, jsonify, Response, make_response
+from flask_cors import CORS
 from collections import defaultdict
 
+# Flask app initialization
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
 
-traffic_data = []  # List to store captured packet data
+# Global constants and variables
+TRAFFIC_DATA = []
+CPU_USAGE = 0
+MEMORY_USAGE = 0
 
 # Known protocol mappings
 PROTOCOLS = {
@@ -29,12 +33,9 @@ APPLICATION_PROTOCOLS = {
     (443, "TCP"): "HTTPS"
 }
 
-# Global variables to store CPU and memory usage
-cpu_usage = 0
-memory_usage = 0
+# Logging configuration
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Set up logging to capture errors and information
-logging.basicConfig(level=logging.INFO)
 
 def get_protocol_name(protocol_number, src_port=None, dst_port=None, layer="TCP"):
     """
@@ -42,18 +43,23 @@ def get_protocol_name(protocol_number, src_port=None, dst_port=None, layer="TCP"
     """
     if protocol_number in PROTOCOLS:
         if src_port and dst_port:
-            return APPLICATION_PROTOCOLS.get((src_port, layer), APPLICATION_PROTOCOLS.get((dst_port, layer), PROTOCOLS[protocol_number]))
+            return APPLICATION_PROTOCOLS.get(
+                (src_port, layer), 
+                APPLICATION_PROTOCOLS.get((dst_port, layer), PROTOCOLS[protocol_number])
+            )
         return PROTOCOLS[protocol_number]
     return f"Unknown ({protocol_number})"
+
 
 def packet_callback(pkt):
     """
     Callback function that processes each packet captured by pyshark.
     """
     try:
-        ip_src = ip_dst = protocol = None
+        ip_src, ip_dst, protocol = None, None, None
         info = []
 
+        # Extract IP layer information
         if hasattr(pkt, 'ip'):
             ip_src = pkt.ip.src
             ip_dst = pkt.ip.dst
@@ -63,20 +69,22 @@ def packet_callback(pkt):
             ip_dst = pkt.ipv6.dst
             protocol = int(pkt.ipv6.nxt)  # Next header field as protocol
 
+        # Continue if IP data is available
         if ip_src and ip_dst and protocol is not None:
-            src_port = dst_port = None
-            layer = None
+            src_port, dst_port, layer = None, None, None
 
+            # Extract transport layer information
             if hasattr(pkt, 'tcp'):
                 layer = "TCP"
                 src_port = int(pkt.tcp.srcport)
                 dst_port = int(pkt.tcp.dstport)
-                info.append(f"Flags: {pkt.tcp.flags}")
-                info.append(f"Window Size: {pkt.tcp.window_size}")
-                info.append(f"Sequence Number: {pkt.tcp.seq}")
-                info.append(f"Acknowledgment Number: {pkt.tcp.ack}")
-                if hasattr(pkt.tcp, 'options'):
-                    info.append(f"Options: {pkt.tcp.options}")
+                info.extend([
+                    f"Flags: {pkt.tcp.flags}",
+                    f"Window Size: {pkt.tcp.window_size}",
+                    f"Sequence Number: {pkt.tcp.seq}",
+                    f"Acknowledgment Number: {pkt.tcp.ack}",
+                    f"Options: {pkt.tcp.options}" if hasattr(pkt.tcp, 'options') else ""
+                ])
 
             elif hasattr(pkt, 'udp'):
                 layer = "UDP"
@@ -97,7 +105,7 @@ def packet_callback(pkt):
             detailed_info = f"{protocol_name} packet from {ip_src}:{src_port} to {ip_dst}:{dst_port}"
 
             packet_info = {
-                "No.": len(traffic_data) + 1,
+                "No.": len(TRAFFIC_DATA) + 1,
                 "Time": pkt.sniff_time.isoformat(),
                 "Source": ip_src,
                 "Destination": ip_dst,
@@ -107,47 +115,61 @@ def packet_callback(pkt):
                 "Detailed Info": detailed_info
             }
 
-            traffic_data.append(packet_info)
+            TRAFFIC_DATA.append(packet_info)
     except Exception as e:
         logging.error(f"Error processing packet: {e}")
+
 
 def start_sniffing(interface):
     """
     Starts the packet capturing process on the specified network interface.
     """
-    capture = pyshark.LiveCapture(interface=interface)
-    capture.apply_on_packets(packet_callback)
+    try:
+        capture = pyshark.LiveCapture(interface=interface)
+        capture.apply_on_packets(packet_callback)
+    except Exception as e:
+        logging.error(f"Failed to start packet capture: {e}")
+
 
 def monitor_system_usage():
-    global cpu_usage, memory_usage
+    """
+    Continuously monitors CPU and memory usage.
+    """
+    global CPU_USAGE, MEMORY_USAGE
     while True:
-        cpu_usage = psutil.cpu_percent(interval=1)
-        memory_info = psutil.virtual_memory()
-        memory_usage = memory_info.percent
+        CPU_USAGE = psutil.cpu_percent(interval=1)
+        MEMORY_USAGE = psutil.virtual_memory().percent
         time.sleep(5)  # Update every 5 seconds
+
 
 @app.route('/traffic', methods=['GET'])
 def get_traffic():
     """
     Endpoint to retrieve captured traffic data in JSON format.
     """
-    return jsonify(traffic_data)
+    return jsonify(TRAFFIC_DATA[-500:])  # Send the last 500 entries
+
 
 @app.route('/export/csv', methods=['GET'])
 def export_csv():
     """
     Endpoint to export captured traffic data as a CSV file.
     """
-    output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow(["No.", "Time", "Source", "Destination", "Protocol", "Length", "Info", "Detailed Info"])
-    for packet in traffic_data:
-        writer.writerow([packet["No."], packet["Time"], packet["Source"], packet["Destination"], packet["Protocol"], packet["Length"], packet["Info"], packet["Detailed Info"]])
+    try:
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(["No.", "Time", "Source", "Destination", "Protocol", "Length", "Info", "Detailed Info"])
+        for packet in TRAFFIC_DATA:
+            writer.writerow([packet["No."], packet["Time"], packet["Source"], packet["Destination"], packet["Protocol"], packet["Length"], packet["Info"], packet["Detailed Info"]])
 
-    response = make_response(output.getvalue())
-    response.headers["Content-Disposition"] = "attachment; filename=traffic_data.csv"
-    response.headers["Content-type"] = "text/csv"
-    return response
+        response = make_response(output.getvalue())
+        response.headers["Content-Disposition"] = "attachment; filename=traffic_data.csv"
+        response.headers["Content-type"] = "text/csv"
+        return response
+    except Exception as e:
+        logging.error(f"Error exporting CSV: {e}")
+        return Response("Failed to export CSV", status=500)
+
 
 @app.route('/system-usage', methods=['GET'])
 def get_system_usage():
@@ -155,19 +177,26 @@ def get_system_usage():
     Endpoint to retrieve current CPU and memory usage.
     """
     return jsonify({
-        'cpu_usage': cpu_usage,
-        'memory_usage': memory_usage
+        'cpu_usage': CPU_USAGE,
+        'memory_usage': MEMORY_USAGE
     })
 
-if __name__ == '__main__':
-    # Start system monitoring in a separate thread
-    monitor_thread = threading.Thread(target=monitor_system_usage)
-    monitor_thread.daemon = True
+
+def main():
+    """
+    Main function to start the application.
+    """
+    # Start system usage monitoring in a separate thread
+    monitor_thread = threading.Thread(target=monitor_system_usage, daemon=True)
     monitor_thread.start()
 
     # Start packet sniffing in a separate thread
-    sniff_thread = threading.Thread(target=start_sniffing, args=("en0",))  # Replace "en0" with your network interface
+    sniff_thread = threading.Thread(target=start_sniffing, args=("en0",), daemon=True)  # Replace "en0" with your network interface
     sniff_thread.start()
 
     # Run the Flask app
     app.run(host='0.0.0.0', port=5000, debug=True)
+
+
+if __name__ == '__main__':
+    main()
