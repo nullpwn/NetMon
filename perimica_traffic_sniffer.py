@@ -7,7 +7,6 @@ import psutil
 import time
 from flask import Flask, jsonify, Response, make_response
 from flask_cors import CORS
-from collections import defaultdict
 
 # Flask app initialization
 app = Flask(__name__)
@@ -17,6 +16,7 @@ CORS(app)  # Enable CORS for all routes
 TRAFFIC_DATA = []
 CPU_USAGE = 0
 MEMORY_USAGE = 0
+DATA_LOCK = threading.Lock()  # Lock for thread-safe access to TRAFFIC_DATA
 
 # Known protocol mappings
 PROTOCOLS = {
@@ -56,7 +56,6 @@ def process_arp_packet(pkt):
     """
     Processes ARP packets and returns a dictionary containing packet details.
     """
-    protocol = 2054  # ARP protocol number
     arp_src_ip = pkt.arp.src_proto_ipv4
     arp_dst_ip = pkt.arp.dst_proto_ipv4
     arp_src_mac = pkt.arp.src_hw_mac
@@ -65,9 +64,7 @@ def process_arp_packet(pkt):
 
     arp_op = "ARP Request" if arp_op_code == 1 else "ARP Reply" if arp_op_code == 2 else f"ARP Opcode {arp_op_code}"
 
-    detailed_info = (f"{arp_op} from {arp_src_ip} ({arp_src_mac}) to {arp_dst_ip} ({arp_dst_mac}) | "
-                     f"Hardware Type: {pkt.arp.hw_type}, Protocol Type: {pkt.arp.proto_type}, "
-                     f"Hardware Size: {pkt.arp.hw_size}, Protocol Size: {pkt.arp.proto_size}")
+    detailed_info = f"{arp_op} from {arp_src_ip} ({arp_src_mac}) to {arp_dst_ip} ({arp_dst_mac})"
 
     return {
         "No.": len(TRAFFIC_DATA) + 1,
@@ -155,21 +152,22 @@ def packet_callback(pkt):
         # Handle ARP packets
         if hasattr(pkt, 'arp'):
             packet_info = process_arp_packet(pkt)
-            TRAFFIC_DATA.append(packet_info)
-            return
-
         # Handle IP packets
-        if hasattr(pkt, 'ip'):
+        elif hasattr(pkt, 'ip'):
             ip_src = pkt.ip.src
             ip_dst = pkt.ip.dst
             protocol = int(pkt.ip.proto)
+            packet_info = process_ip_packet(pkt, protocol, ip_src, ip_dst)
         elif hasattr(pkt, 'ipv6'):
             ip_src = pkt.ipv6.src
             ip_dst = pkt.ipv6.dst
             protocol = int(pkt.ipv6.nxt)  # Next header field as protocol
-
-        if ip_src and ip_dst and protocol is not None:
             packet_info = process_ip_packet(pkt, protocol, ip_src, ip_dst)
+        else:
+            return  # Skip packets that aren't IP or ARP
+
+        # Thread-safe addition to TRAFFIC_DATA
+        with DATA_LOCK:
             TRAFFIC_DATA.append(packet_info)
 
     except Exception as e:
@@ -203,7 +201,9 @@ def get_traffic():
     """
     Endpoint to retrieve captured traffic data in JSON format.
     """
-    return jsonify(TRAFFIC_DATA[-500:])  # Send the last 500 entries
+    with DATA_LOCK:
+        recent_data = TRAFFIC_DATA[-500:]  # Send the last 500 entries
+    return jsonify(recent_data)
 
 
 @app.route('/export/csv', methods=['GET'])
@@ -215,8 +215,10 @@ def export_csv():
         output = io.StringIO()
         writer = csv.writer(output)
         writer.writerow(["No.", "Time", "Source", "Destination", "Protocol", "Length", "Info", "Detailed Info"])
-        for packet in TRAFFIC_DATA:
-            writer.writerow([packet["No."], packet["Time"], packet["Source"], packet["Destination"], packet["Protocol"], packet["Length"], packet["Info"], packet["Detailed Info"]])
+        
+        with DATA_LOCK:
+            for packet in TRAFFIC_DATA:
+                writer.writerow([packet["No."], packet["Time"], packet["Source"], packet["Destination"], packet["Protocol"], packet["Length"], packet["Info"], packet["Detailed Info"]])
 
         response = make_response(output.getvalue())
         response.headers["Content-Disposition"] = "attachment; filename=traffic_data.csv"
