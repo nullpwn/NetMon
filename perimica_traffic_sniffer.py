@@ -64,7 +64,11 @@ def process_arp_packet(pkt):
 
     arp_op = "ARP Request" if arp_op_code == 1 else "ARP Reply" if arp_op_code == 2 else f"ARP Opcode {arp_op_code}"
 
-    detailed_info = f"{arp_op} from {arp_src_ip} ({arp_src_mac}) to {arp_dst_ip} ({arp_dst_mac})"
+    # Remove the destination MAC address if it is 00:00:00:00:00:00 in ARP requests
+    if arp_dst_mac == "00:00:00:00:00:00":
+        detailed_info = f"{arp_op} from {arp_src_ip} ({arp_src_mac}) to {arp_dst_ip}"
+    else:
+        detailed_info = f"{arp_op} from {arp_src_ip} ({arp_src_mac}) to {arp_dst_ip} ({arp_dst_mac})"
 
     return {
         "No.": len(TRAFFIC_DATA) + 1,
