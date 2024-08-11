@@ -97,8 +97,25 @@ def packet_callback(pkt):
                 info.append(http_info)
 
             if hasattr(pkt, 'dns'):
-                dns_info = f"DNS Query: {pkt.dns.qry_name} Type: {pkt.dns.qry_type}"
-                info.append(dns_info)
+                # Improved DNS query/response information
+                if pkt.dns.qry_name:
+                    dns_info = f"DNS Query: {pkt.dns.qry_name} | Type: {pkt.dns.qry_type}"
+                    info.append(dns_info)
+                if hasattr(pkt.dns, 'a'):
+                    dns_response_info = f"DNS Response: {pkt.dns.a}"
+                    info.append(dns_response_info)
+                if hasattr(pkt.dns, 'aaaa'):
+                    dns_response_info_aaaa = f"DNS Response (AAAA): {pkt.dns.aaaa}"
+                    info.append(dns_response_info_aaaa)
+                if hasattr(pkt.dns, 'cname'):
+                    dns_cname_info = f"CNAME: {pkt.dns.cname}"
+                    info.append(dns_cname_info)
+                # Add detailed MDNS information similar to the example you provided
+                if hasattr(pkt.dns, 'qry_name') and hasattr(pkt.dns, 'qry_type'):
+                    for i in range(int(pkt.dns.qry_name.count(' ')) + 1):
+                        qry_name = getattr(pkt.dns, f'qry_name_{i}', pkt.dns.qry_name)
+                        qry_type = getattr(pkt.dns, f'qry_type_{i}', pkt.dns.qry_type)
+                        info.append(f"Standard query 0x{pkt.dns.id} {qry_name}, \"QU\" question {qry_type}")
 
             protocol_name = get_protocol_name(protocol, src_port, dst_port, layer)
 
