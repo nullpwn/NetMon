@@ -44,7 +44,7 @@ def get_protocol_name(protocol_number, src_port=None, dst_port=None, layer="TCP"
     if protocol_number in PROTOCOLS:
         if src_port and dst_port:
             return APPLICATION_PROTOCOLS.get(
-                (src_port, layer), 
+                (src_port, layer),
                 APPLICATION_PROTOCOLS.get((dst_port, layer), PROTOCOLS[protocol_number])
             )
         return PROTOCOLS[protocol_number]
