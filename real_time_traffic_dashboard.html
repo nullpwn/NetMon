@@ -160,6 +160,10 @@
             color: #e74c3c;
         }
 
+        .protocol-arp {
+            color: #f39c12;
+        }
+
         .chart-container {
             width: 80%;
             margin: 20px auto;
@@ -481,6 +485,7 @@
                     <option value="mDNS">mDNS</option>
                     <option value="UDP">UDP</option>
                     <option value="TCP">TCP</option>
+                    <option value="ARP">ARP</option>
                 </select>
             </div>
             <div class="filter-group">
@@ -627,11 +632,11 @@
         const protocolChart = new Chart(protocolCtx, {
             type: 'pie',
             data: {
-                labels: ['HTTP', 'HTTPS', 'mDNS', 'UDP', 'TCP'],
+                labels: ['HTTP', 'HTTPS', 'mDNS', 'UDP', 'TCP', 'ARP'],
                 datasets: [{
                     label: 'Protocol Distribution',
-                    data: [0, 0, 0, 0, 0],
-                    backgroundColor: ['#3498db', '#2ecc71', '#e67e22', '#9b59b6', '#e74c3c']
+                    data: [0, 0, 0, 0, 0, 0],
+                    backgroundColor: ['#3498db', '#2ecc71', '#e67e22', '#9b59b6', '#e74c3c', '#f39c12']
                 }]
             },
             options: {
@@ -763,7 +768,7 @@
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 const data = await response.json();
 
-                const protocolData = { 'HTTP': 0, 'HTTPS': 0, 'mDNS': 0, 'UDP': 0, 'TCP': 0 };
+                const protocolData = { 'HTTP': 0, 'HTTPS': 0, 'mDNS': 0, 'UDP': 0, 'TCP': 0, 'ARP': 0 };
                 const packetCount = data.length;
 
                 trafficChart.data.labels = [];

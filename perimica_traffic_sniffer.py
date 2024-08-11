@@ -23,7 +23,8 @@ PROTOCOLS = {
     1: "ICMP",
     6: "TCP",
     17: "UDP",
-    58: "ICMPv6"
+    58: "ICMPv6",
+    2054: "ARP"  # Added ARP protocol number (EtherType 0x0806)
 }
 
 # Application layer protocol mapping based on port numbers
@@ -58,6 +59,32 @@ def packet_callback(pkt):
     try:
         ip_src, ip_dst, protocol = None, None, None
         info = []
+
+        # Extract ARP layer information
+        if hasattr(pkt, 'arp'):
+            protocol = 2054  # ARP protocol number
+            arp_src_ip = pkt.arp.src_proto_ipv4
+            arp_dst_ip = pkt.arp.dst_proto_ipv4
+            arp_src_mac = pkt.arp.src_hw_mac
+            arp_dst_mac = pkt.arp.dst_hw_mac
+            arp_op_code = pkt.arp.opcode
+
+            detailed_info = f"ARP {arp_op_code} from {arp_src_ip} ({arp_src_mac}) to {arp_dst_ip} ({arp_dst_mac})"
+            info.append(detailed_info)
+
+            packet_info = {
+                "No.": len(TRAFFIC_DATA) + 1,
+                "Time": pkt.sniff_time.isoformat(),
+                "Source": arp_src_ip,
+                "Destination": arp_dst_ip,
+                "Protocol": "ARP",
+                "Length": pkt.length,
+                "Info": " | ".join(info),
+                "Detailed Info": detailed_info
+            }
+
+            TRAFFIC_DATA.append(packet_info)
+            return  # No need to process further layers for ARP
 
         # Extract IP layer information
         if hasattr(pkt, 'ip'):
@@ -110,7 +137,7 @@ def packet_callback(pkt):
                 if hasattr(pkt.dns, 'cname'):
                     dns_cname_info = f"CNAME: {pkt.dns.cname}"
                     info.append(dns_cname_info)
-                # Add detailed MDNS information similar to the example you provided
+                # Add detailed MDNS information
                 if hasattr(pkt.dns, 'qry_name') and hasattr(pkt.dns, 'qry_type'):
                     for i in range(int(pkt.dns.qry_name.count(' ')) + 1):
                         qry_name = getattr(pkt.dns, f'qry_name_{i}', pkt.dns.qry_name)
