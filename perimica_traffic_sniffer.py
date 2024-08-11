@@ -24,7 +24,7 @@ PROTOCOLS = {
     6: "TCP",
     17: "UDP",
     58: "ICMPv6",
-    2054: "ARP"  # Added ARP protocol number (EtherType 0x0806)
+    2054: "ARP"  # ARP protocol number (EtherType 0x0806)
 }
 
 # Application layer protocol mapping based on port numbers
@@ -52,41 +52,113 @@ def get_protocol_name(protocol_number, src_port=None, dst_port=None, layer="TCP"
     return f"Unknown ({protocol_number})"
 
 
+def process_arp_packet(pkt):
+    """
+    Processes ARP packets and returns a dictionary containing packet details.
+    """
+    protocol = 2054  # ARP protocol number
+    arp_src_ip = pkt.arp.src_proto_ipv4
+    arp_dst_ip = pkt.arp.dst_proto_ipv4
+    arp_src_mac = pkt.arp.src_hw_mac
+    arp_dst_mac = pkt.arp.dst_hw_mac
+    arp_op_code = int(pkt.arp.opcode)
+
+    arp_op = "ARP Request" if arp_op_code == 1 else "ARP Reply" if arp_op_code == 2 else f"ARP Opcode {arp_op_code}"
+
+    detailed_info = (f"{arp_op} from {arp_src_ip} ({arp_src_mac}) to {arp_dst_ip} ({arp_dst_mac}) | "
+                     f"Hardware Type: {pkt.arp.hw_type}, Protocol Type: {pkt.arp.proto_type}, "
+                     f"Hardware Size: {pkt.arp.hw_size}, Protocol Size: {pkt.arp.proto_size}")
+
+    return {
+        "No.": len(TRAFFIC_DATA) + 1,
+        "Time": pkt.sniff_time.isoformat(),
+        "Source": arp_src_ip,
+        "Destination": arp_dst_ip,
+        "Protocol": "ARP",
+        "Length": pkt.length,
+        "Info": arp_op,
+        "Detailed Info": detailed_info
+    }
+
+
+def process_ip_packet(pkt, protocol, ip_src, ip_dst):
+    """
+    Processes IP packets and returns a dictionary containing packet details.
+    """
+    src_port, dst_port, layer, info = None, None, None, []
+
+    # Extract transport layer information
+    if hasattr(pkt, 'tcp'):
+        layer = "TCP"
+        src_port = int(pkt.tcp.srcport)
+        dst_port = int(pkt.tcp.dstport)
+        info.extend([
+            f"Flags: {pkt.tcp.flags}",
+            f"Window Size: {pkt.tcp.window_size}",
+            f"Sequence Number: {pkt.tcp.seq}",
+            f"Acknowledgment Number: {pkt.tcp.ack}",
+            f"Options: {pkt.tcp.options}" if hasattr(pkt.tcp, 'options') else ""
+        ])
+
+    elif hasattr(pkt, 'udp'):
+        layer = "UDP"
+        src_port = int(pkt.udp.srcport)
+        dst_port = int(pkt.udp.dstport)
+        info.append(f"Length: {pkt.udp.length}")
+
+    if hasattr(pkt, 'http'):
+        http_info = f"HTTP {pkt.http.request_method} {pkt.http.host}{pkt.http.request_uri}"
+        info.append(http_info)
+
+    if hasattr(pkt, 'dns'):
+        if pkt.dns.qry_name:
+            dns_info = f"DNS Query: {pkt.dns.qry_name} | Type: {pkt.dns.qry_type}"
+            info.append(dns_info)
+        if hasattr(pkt.dns, 'a'):
+            dns_response_info = f"DNS Response: {pkt.dns.a}"
+            info.append(dns_response_info)
+        if hasattr(pkt.dns, 'aaaa'):
+            dns_response_info_aaaa = f"DNS Response (AAAA): {pkt.dns.aaaa}"
+            info.append(dns_response_info_aaaa)
+        if hasattr(pkt.dns, 'cname'):
+            dns_cname_info = f"CNAME: {pkt.dns.cname}"
+            info.append(dns_cname_info)
+        if hasattr(pkt.dns, 'qry_name') and hasattr(pkt.dns, 'qry_type'):
+            for i in range(int(pkt.dns.qry_name.count(' ')) + 1):
+                qry_name = getattr(pkt.dns, f'qry_name_{i}', pkt.dns.qry_name)
+                qry_type = getattr(pkt.dns, f'qry_type_{i}', pkt.dns.qry_type)
+                info.append(f"Standard query 0x{pkt.dns.id} {qry_name}, \"QU\" question {qry_type}")
+
+    protocol_name = get_protocol_name(protocol, src_port, dst_port, layer)
+
+    detailed_info = f"{protocol_name} packet from {ip_src}:{src_port} to {ip_dst}:{dst_port}"
+
+    return {
+        "No.": len(TRAFFIC_DATA) + 1,
+        "Time": pkt.sniff_time.isoformat(),
+        "Source": ip_src,
+        "Destination": ip_dst,
+        "Protocol": protocol_name,
+        "Length": pkt.length,
+        "Info": " | ".join(info),
+        "Detailed Info": detailed_info
+    }
+
+
 def packet_callback(pkt):
     """
     Callback function that processes each packet captured by pyshark.
     """
     try:
         ip_src, ip_dst, protocol = None, None, None
-        info = []
 
-        # Extract ARP layer information
+        # Handle ARP packets
         if hasattr(pkt, 'arp'):
-            protocol = 2054  # ARP protocol number
-            arp_src_ip = pkt.arp.src_proto_ipv4
-            arp_dst_ip = pkt.arp.dst_proto_ipv4
-            arp_src_mac = pkt.arp.src_hw_mac
-            arp_dst_mac = pkt.arp.dst_hw_mac
-            arp_op_code = pkt.arp.opcode
-
-            detailed_info = f"ARP {arp_op_code} from {arp_src_ip} ({arp_src_mac}) to {arp_dst_ip} ({arp_dst_mac})"
-            info.append(detailed_info)
-
-            packet_info = {
-                "No.": len(TRAFFIC_DATA) + 1,
-                "Time": pkt.sniff_time.isoformat(),
-                "Source": arp_src_ip,
-                "Destination": arp_dst_ip,
-                "Protocol": "ARP",
-                "Length": pkt.length,
-                "Info": " | ".join(info),
-                "Detailed Info": detailed_info
-            }
-
+            packet_info = process_arp_packet(pkt)
             TRAFFIC_DATA.append(packet_info)
-            return  # No need to process further layers for ARP
+            return
 
-        # Extract IP layer information
+        # Handle IP packets
         if hasattr(pkt, 'ip'):
             ip_src = pkt.ip.src
             ip_dst = pkt.ip.dst
@@ -96,70 +168,10 @@ def packet_callback(pkt):
             ip_dst = pkt.ipv6.dst
             protocol = int(pkt.ipv6.nxt)  # Next header field as protocol
 
-        # Continue if IP data is available
         if ip_src and ip_dst and protocol is not None:
-            src_port, dst_port, layer = None, None, None
-
-            # Extract transport layer information
-            if hasattr(pkt, 'tcp'):
-                layer = "TCP"
-                src_port = int(pkt.tcp.srcport)
-                dst_port = int(pkt.tcp.dstport)
-                info.extend([
-                    f"Flags: {pkt.tcp.flags}",
-                    f"Window Size: {pkt.tcp.window_size}",
-                    f"Sequence Number: {pkt.tcp.seq}",
-                    f"Acknowledgment Number: {pkt.tcp.ack}",
-                    f"Options: {pkt.tcp.options}" if hasattr(pkt.tcp, 'options') else ""
-                ])
-
-            elif hasattr(pkt, 'udp'):
-                layer = "UDP"
-                src_port = int(pkt.udp.srcport)
-                dst_port = int(pkt.udp.dstport)
-                info.append(f"Length: {pkt.udp.length}")
-
-            if hasattr(pkt, 'http'):
-                http_info = f"HTTP {pkt.http.request_method} {pkt.http.host}{pkt.http.request_uri}"
-                info.append(http_info)
-
-            if hasattr(pkt, 'dns'):
-                # Improved DNS query/response information
-                if pkt.dns.qry_name:
-                    dns_info = f"DNS Query: {pkt.dns.qry_name} | Type: {pkt.dns.qry_type}"
-                    info.append(dns_info)
-                if hasattr(pkt.dns, 'a'):
-                    dns_response_info = f"DNS Response: {pkt.dns.a}"
-                    info.append(dns_response_info)
-                if hasattr(pkt.dns, 'aaaa'):
-                    dns_response_info_aaaa = f"DNS Response (AAAA): {pkt.dns.aaaa}"
-                    info.append(dns_response_info_aaaa)
-                if hasattr(pkt.dns, 'cname'):
-                    dns_cname_info = f"CNAME: {pkt.dns.cname}"
-                    info.append(dns_cname_info)
-                # Add detailed MDNS information
-                if hasattr(pkt.dns, 'qry_name') and hasattr(pkt.dns, 'qry_type'):
-                    for i in range(int(pkt.dns.qry_name.count(' ')) + 1):
-                        qry_name = getattr(pkt.dns, f'qry_name_{i}', pkt.dns.qry_name)
-                        qry_type = getattr(pkt.dns, f'qry_type_{i}', pkt.dns.qry_type)
-                        info.append(f"Standard query 0x{pkt.dns.id} {qry_name}, \"QU\" question {qry_type}")
-
-            protocol_name = get_protocol_name(protocol, src_port, dst_port, layer)
-
-            detailed_info = f"{protocol_name} packet from {ip_src}:{src_port} to {ip_dst}:{dst_port}"
-
-            packet_info = {
-                "No.": len(TRAFFIC_DATA) + 1,
-                "Time": pkt.sniff_time.isoformat(),
-                "Source": ip_src,
-                "Destination": ip_dst,
-                "Protocol": protocol_name,
-                "Length": pkt.length,
-                "Info": " | ".join(info),
-                "Detailed Info": detailed_info
-            }
-
+            packet_info = process_ip_packet(pkt, protocol, ip_src, ip_dst)
             TRAFFIC_DATA.append(packet_info)
+
     except Exception as e:
         logging.error(f"Error processing packet: {e}")
 
