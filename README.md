@@ -45,7 +45,7 @@ The Real-Time Traffic Analysis Dashboard is a tool designed to monitor and analy
 To run the traffic sniffer and serve the dashboard, you'll need to install the required Python packages. Use the following command:
 
 ```bash
-pip install scapy Flask psutil
+pip install pyshark Flask psutil
 ```
 
 ## Usage
