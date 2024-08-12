@@ -1,12 +1,12 @@
 import threading
 import csv
 import logging
-import pyshark
 import io
 import psutil
 import time
 from flask import Flask, jsonify, Response, make_response
 from flask_cors import CORS
+from scapy.all import sniff, ARP, IP, TCP, UDP, DNS, DNSQR, DNSRR
 
 # Flask app initialization
 app = Flask(__name__)
@@ -56,11 +56,11 @@ def process_arp_packet(pkt):
     """
     Processes ARP packets and returns a dictionary containing packet details.
     """
-    arp_src_ip = pkt.arp.src_proto_ipv4
-    arp_dst_ip = pkt.arp.dst_proto_ipv4
-    arp_src_mac = pkt.arp.src_hw_mac
-    arp_dst_mac = pkt.arp.dst_hw_mac
-    arp_op_code = int(pkt.arp.opcode)
+    arp_src_ip = pkt[ARP].psrc
+    arp_dst_ip = pkt[ARP].pdst
+    arp_src_mac = pkt[ARP].hwsrc
+    arp_dst_mac = pkt[ARP].hwdst
+    arp_op_code = pkt[ARP].op
 
     arp_op = "ARP Request" if arp_op_code == 1 else "ARP Reply" if arp_op_code == 2 else f"ARP Opcode {arp_op_code}"
 
@@ -72,101 +72,103 @@ def process_arp_packet(pkt):
 
     return {
         "No.": len(TRAFFIC_DATA) + 1,
-        "Time": pkt.sniff_time.isoformat(),
+        "Time": time.strftime('%Y-%m-%d %H:%M:%S'),
         "Source": arp_src_ip,
         "Destination": arp_dst_ip,
         "Protocol": "ARP",
-        "Length": pkt.length,
+        "Length": len(pkt),
         "Info": arp_op,
         "Detailed Info": detailed_info
     }
 
 
-def process_ip_packet(pkt, protocol, ip_src, ip_dst):
+def process_ip_packet(pkt):
     """
     Processes IP packets and returns a dictionary containing packet details.
     """
+    ip_src = pkt[IP].src
+    ip_dst = pkt[IP].dst
+    protocol = pkt[IP].proto
+
     src_port, dst_port, layer, info = None, None, None, []
 
     # Extract transport layer information
-    if hasattr(pkt, 'tcp'):
+    if TCP in pkt:
         layer = "TCP"
-        src_port = int(pkt.tcp.srcport)
-        dst_port = int(pkt.tcp.dstport)
+        src_port = pkt[TCP].sport
+        dst_port = pkt[TCP].dport
         info.extend([
-            f"Flags: {pkt.tcp.flags}",
-            f"Window Size: {pkt.tcp.window_size}",
-            f"Sequence Number: {pkt.tcp.seq}",
-            f"Acknowledgment Number: {pkt.tcp.ack}",
-            f"Options: {pkt.tcp.options}" if hasattr(pkt.tcp, 'options') else ""
+            f"Flags: {pkt[TCP].flags}",
+            f"Window Size: {pkt[TCP].window}",
+            f"Sequence Number: {pkt[TCP].seq}",
+            f"Acknowledgment Number: {pkt[TCP].ack}",
         ])
+        if pkt[TCP].options:
+            info.append(f"Options: {pkt[TCP].options}")
 
-    elif hasattr(pkt, 'udp'):
+    elif UDP in pkt:
         layer = "UDP"
-        src_port = int(pkt.udp.srcport)
-        dst_port = int(pkt.udp.dstport)
-        info.append(f"Length: {pkt.udp.length}")
+        src_port = pkt[UDP].sport
+        dst_port = pkt[UDP].dport
+        info.append(f"Length: {pkt[UDP].len}")
 
-    if hasattr(pkt, 'http'):
-        http_info = f"HTTP {pkt.http.request_method} {pkt.http.host}{pkt.http.request_uri}"
-        info.append(http_info)
-
-    if hasattr(pkt, 'dns'):
-        if pkt.dns.qry_name:
-            dns_info = f"DNS Query: {pkt.dns.qry_name} | Type: {pkt.dns.qry_type}"
-            info.append(dns_info)
-        if hasattr(pkt.dns, 'a'):
-            dns_response_info = f"DNS Response: {pkt.dns.a}"
-            info.append(dns_response_info)
-        if hasattr(pkt.dns, 'aaaa'):
-            dns_response_info_aaaa = f"DNS Response (AAAA): {pkt.dns.aaaa}"
-            info.append(dns_response_info_aaaa)
-        if hasattr(pkt.dns, 'cname'):
-            dns_cname_info = f"CNAME: {pkt.dns.cname}"
-            info.append(dns_cname_info)
-        if hasattr(pkt.dns, 'qry_name') and hasattr(pkt.dns, 'qry_type'):
-            for i in range(int(pkt.dns.qry_name.count(' ')) + 1):
-                qry_name = getattr(pkt.dns, f'qry_name_{i}', pkt.dns.qry_name)
-                qry_type = getattr(pkt.dns, f'qry_type_{i}', pkt.dns.qry_type)
-                info.append(f"Standard query 0x{pkt.dns.id} {qry_name}, \"QU\" question {qry_type}")
+    if DNS in pkt:
+        dns_info = process_dns_packet(pkt[DNS])
+        info.extend(dns_info)
 
     protocol_name = get_protocol_name(protocol, src_port, dst_port, layer)
-
     detailed_info = f"{protocol_name} packet from {ip_src}:{src_port} to {ip_dst}:{dst_port}"
 
     return {
         "No.": len(TRAFFIC_DATA) + 1,
-        "Time": pkt.sniff_time.isoformat(),
+        "Time": time.strftime('%Y-%m-%d %H:%M:%S'),
         "Source": ip_src,
         "Destination": ip_dst,
         "Protocol": protocol_name,
-        "Length": pkt.length,
+        "Length": len(pkt),
         "Info": " | ".join(info),
         "Detailed Info": detailed_info
     }
 
 
+def process_dns_packet(dns_pkt):
+    """
+    Processes DNS packets and returns a list of detailed information strings.
+    """
+    info = []
+
+    if dns_pkt.qr == 0:  # DNS query
+        for i in range(dns_pkt.qdcount):
+            query_name = dns_pkt[DNSQR][i].qname.decode()
+            query_type = dns_pkt[DNSQR][i].qtype
+            info.append(f"DNS Query: {query_name} | Type: {query_type}")
+
+    elif dns_pkt.qr == 1:  # DNS response
+        for i in range(dns_pkt.ancount):
+            response_name = dns_pkt[DNSRR][i].rrname.decode()
+            response_type = dns_pkt[DNSRR][i].type
+            response_data = dns_pkt[DNSRR][i].rdata
+            if response_type == 1:  # A record
+                info.append(f"DNS Response: {response_name} | A: {response_data}")
+            elif response_type == 28:  # AAAA record
+                info.append(f"DNS Response: {response_name} | AAAA: {response_data}")
+            elif response_type == 5:  # CNAME record
+                info.append(f"CNAME: {response_name} -> {response_data}")
+            else:
+                info.append(f"DNS Response: {response_name} | Type: {response_type} | Data: {response_data}")
+
+    return info
+
+
 def packet_callback(pkt):
     """
-    Callback function that processes each packet captured by pyshark.
+    Callback function that processes each packet captured by scapy.
     """
     try:
-        ip_src, ip_dst, protocol = None, None, None
-
-        # Handle ARP packets
-        if hasattr(pkt, 'arp'):
+        if ARP in pkt:
             packet_info = process_arp_packet(pkt)
-        # Handle IP packets
-        elif hasattr(pkt, 'ip'):
-            ip_src = pkt.ip.src
-            ip_dst = pkt.ip.dst
-            protocol = int(pkt.ip.proto)
-            packet_info = process_ip_packet(pkt, protocol, ip_src, ip_dst)
-        elif hasattr(pkt, 'ipv6'):
-            ip_src = pkt.ipv6.src
-            ip_dst = pkt.ipv6.dst
-            protocol = int(pkt.ipv6.nxt)  # Next header field as protocol
-            packet_info = process_ip_packet(pkt, protocol, ip_src, ip_dst)
+        elif IP in pkt:
+            packet_info = process_ip_packet(pkt)
         else:
             return  # Skip packets that aren't IP or ARP
 
@@ -183,8 +185,7 @@ def start_sniffing(interface):
     Starts the packet capturing process on the specified network interface.
     """
     try:
-        capture = pyshark.LiveCapture(interface=interface)
-        capture.apply_on_packets(packet_callback)
+        sniff(iface=interface, prn=packet_callback, store=False)
     except Exception as e:
         logging.error(f"Failed to start packet capture: {e}")
 
@@ -219,7 +220,7 @@ def export_csv():
         output = io.StringIO()
         writer = csv.writer(output)
         writer.writerow(["No.", "Time", "Source", "Destination", "Protocol", "Length", "Info", "Detailed Info"])
-        
+
         with DATA_LOCK:
             for packet in TRAFFIC_DATA:
                 writer.writerow([packet["No."], packet["Time"], packet["Source"], packet["Destination"], packet["Protocol"], packet["Length"], packet["Info"], packet["Detailed Info"]])
@@ -253,7 +254,7 @@ def main():
     monitor_thread.start()
 
     # Start packet sniffing in a separate thread
-    sniff_thread = threading.Thread(target=start_sniffing, args=("en0",), daemon=True)  # Replace "en0" with your network interface
+    sniff_thread = threading.Thread(target=start_sniffing, args=("eth1",), daemon=True)  # Replace "eth1" with your network interface
     sniff_thread.start()
 
     # Run the Flask app
