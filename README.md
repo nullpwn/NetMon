@@ -2,24 +2,6 @@
 
 This repository contains a Python-based network traffic sniffer and a web-based dashboard that visualizes real-time traffic data. The dashboard provides insights into various network protocols, packet lengths, system resource usage, and allows users to filter and analyze traffic data interactively.
 
-## Table of Contents
-
-- [Real-Time Traffic Analysis Dashboard](#real-time-traffic-analysis-dashboard)
-  - [Table of Contents](#table-of-contents)
-  - [Overview](#overview)
-  - [Features](#features)
-  - [Installation](#installation)
-    - [Prerequisites](#prerequisites)
-    - [Python Package Installation](#python-package-installation)
-  - [Usage](#usage)
-    - [Running the Traffic Sniffer](#running-the-traffic-sniffer)
-    - [Accessing the Dashboard](#accessing-the-dashboard)
-    - [Using the Dashboard](#using-the-dashboard)
-      - [Filtering Traffic Data](#filtering-traffic-data)
-      - [Exporting Data](#exporting-data)
-      - [Stopping the Sniffer](#stopping-the-sniffer)
-  - [Troubleshooting](#troubleshooting)
-
 ## Overview
 
 The Real-Time Traffic Analysis Dashboard is a tool designed to monitor and analyze network traffic in real-time. It captures packets, categorizes them by protocol, and displays the data through interactive charts and tables. Additionally, it monitors system resource usage such as CPU and RAM, providing a comprehensive view of network activity and system performance.
