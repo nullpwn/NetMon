@@ -4,9 +4,11 @@ import logging
 import io
 import psutil
 import time
+import socket  # Import the socket module
 from flask import Flask, jsonify, Response, make_response
 from flask_cors import CORS
 from scapy.all import sniff, ARP, IP, TCP, UDP, DNS, DNSQR, DNSRR
+import argparse
 
 # Flask app initialization
 app = Flask(__name__)
@@ -37,7 +39,6 @@ APPLICATION_PROTOCOLS = {
 # Logging configuration
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-
 def get_protocol_name(protocol_number, src_port=None, dst_port=None, layer="TCP"):
     """
     Returns the protocol name based on the protocol number and optional port numbers.
@@ -50,7 +51,6 @@ def get_protocol_name(protocol_number, src_port=None, dst_port=None, layer="TCP"
             )
         return PROTOCOLS[protocol_number]
     return f"Unknown ({protocol_number})"
-
 
 def process_arp_packet(pkt):
     """
@@ -80,7 +80,6 @@ def process_arp_packet(pkt):
         "Info": arp_op,
         "Detailed Info": detailed_info
     }
-
 
 def process_ip_packet(pkt):
     """
@@ -130,7 +129,6 @@ def process_ip_packet(pkt):
         "Detailed Info": detailed_info
     }
 
-
 def process_dns_packet(dns_pkt):
     """
     Processes DNS packets and returns a list of detailed information strings.
@@ -159,7 +157,6 @@ def process_dns_packet(dns_pkt):
 
     return info
 
-
 def packet_callback(pkt):
     """
     Callback function that processes each packet captured by scapy.
@@ -179,6 +176,45 @@ def packet_callback(pkt):
     except Exception as e:
         logging.error(f"Error processing packet: {e}")
 
+def get_best_interface():
+    """
+    Returns the best network interface based on the following priorities:
+    1. Active interfaces with both IPv4 and IPv6 addresses.
+    2. Active interfaces with an IPv4 address and no IPv6 address.
+    3. Active interfaces with an IPv6 address and no IPv4 address.
+    """
+    interfaces = psutil.net_if_addrs()
+    active_interfaces = psutil.net_if_stats()
+
+    # Store the best interfaces according to the specified priorities
+    ipv4_and_ipv6 = None
+    ipv4_only = None
+    ipv6_only = None
+
+    for interface, addrs in interfaces.items():
+        if active_interfaces[interface].isup:
+            has_ipv4 = False
+            has_ipv6 = False
+            for addr in addrs:
+                if addr.family == socket.AF_INET:  # Check for an IPv4 address
+                    has_ipv4 = True
+                if addr.family == socket.AF_INET6:  # Check for an IPv6 address
+                    has_ipv6 = True
+            if has_ipv4 and has_ipv6:
+                ipv4_and_ipv6 = interface  # Highest priority
+            elif has_ipv4:
+                ipv4_only = interface  # Second priority
+            elif has_ipv6:
+                ipv6_only = interface  # Third priority
+
+    # Return the best available interface based on the priorities
+    if ipv4_and_ipv6:
+        return ipv4_and_ipv6
+    elif ipv4_only:
+        return ipv4_only
+    elif ipv6_only:
+        return ipv6_only
+    return None
 
 def start_sniffing(interface):
     """
@@ -188,7 +224,6 @@ def start_sniffing(interface):
         sniff(iface=interface, prn=packet_callback, store=False)
     except Exception as e:
         logging.error(f"Failed to start packet capture: {e}")
-
 
 def monitor_system_usage():
     """
@@ -200,7 +235,6 @@ def monitor_system_usage():
         MEMORY_USAGE = psutil.virtual_memory().percent
         time.sleep(5)  # Update every 5 seconds
 
-
 @app.route('/traffic', methods=['GET'])
 def get_traffic():
     """
@@ -209,7 +243,6 @@ def get_traffic():
     with DATA_LOCK:
         recent_data = TRAFFIC_DATA[-500:]  # Send the last 500 entries
     return jsonify(recent_data)
-
 
 @app.route('/export/csv', methods=['GET'])
 def export_csv():
@@ -233,7 +266,6 @@ def export_csv():
         logging.error(f"Error exporting CSV: {e}")
         return Response("Failed to export CSV", status=500)
 
-
 @app.route('/system-usage', methods=['GET'])
 def get_system_usage():
     """
@@ -244,22 +276,37 @@ def get_system_usage():
         'memory_usage': MEMORY_USAGE
     })
 
-
 def main():
     """
     Main function to start the application.
     """
+    # Argument parsing
+    parser = argparse.ArgumentParser(description="Traffic sniffer")
+    parser.add_argument(
+        '-i', '--interface', 
+        type=str, 
+        help='Network interface to sniff on'
+    )
+    
+    args = parser.parse_args()
+    
+    # Automatically select the best interface if none is provided
+    interface = args.interface if args.interface else get_best_interface()
+    if not interface:
+        raise RuntimeError("No active network interface with valid IPv4 or IPv6 addresses found.")
+    
+    logging.info(f"Using network interface: {interface}")
+    
     # Start system usage monitoring in a separate thread
     monitor_thread = threading.Thread(target=monitor_system_usage, daemon=True)
     monitor_thread.start()
 
     # Start packet sniffing in a separate thread
-    sniff_thread = threading.Thread(target=start_sniffing, args=("eth1",), daemon=True)  # Replace "eth1" with your network interface
+    sniff_thread = threading.Thread(target=start_sniffing, args=(interface,), daemon=True)
     sniff_thread.start()
 
     # Run the Flask app
     app.run(host='0.0.0.0', port=5000, debug=True)
-
 
 if __name__ == '__main__':
     main()
