@@ -50,6 +50,12 @@ pip install scapy Flask psutil
 
 ## Usage
 
+### Installing the Requirements
+
+```bash
+pip install -r requirements.txt
+```
+
 ### Running the Traffic Sniffer
 
 To start the traffic sniffer, run the following command:
