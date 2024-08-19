@@ -35,12 +35,12 @@ pip install -r requirements.txt
 To start the traffic sniffer, run the following command:
 
 ```bash
-python perimica_traffic_sniffer.py
+python traffic_sniffer.py
 ```
 
 ### Accessing the Dashboard
 
-After starting the sniffer, you can access the dashboard by opening `real_time_traffic_dashboard.html` in a web browser.
+After starting the sniffer, you can access the dashboard by opening `traffic_dashboard.html` in a web browser.
 
 ### Using the Dashboard
 
