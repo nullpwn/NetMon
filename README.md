@@ -55,7 +55,3 @@ To export the traffic data as a CSV file, click the "Download CSV" button on the
 #### Stopping the Sniffer
 
 To stop the sniffer, press `Ctrl+C` in the terminal where the sniffer is running.
-
-## Troubleshooting
-
-If you encounter issues, ensure that all required Python packages are installed and that your network interface is correctly specified in the sniffer script.
