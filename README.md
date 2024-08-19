@@ -40,14 +40,6 @@ The Real-Time Traffic Analysis Dashboard is a tool designed to monitor and analy
 - **Python 3.7+**: Make sure Python is installed on your system. You can download it from [python.org](https://www.python.org/).
 - **pip**: Python's package installer should be available. It comes pre-installed with Python.
 
-### Python Package Installation
-
-To run the traffic sniffer and serve the dashboard, you'll need to install the required Python packages. Use the following command:
-
-```bash
-pip install scapy Flask psutil
-```
-
 ## Usage
 
 ### Installing the Requirements
