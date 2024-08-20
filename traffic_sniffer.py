@@ -4,7 +4,7 @@ import logging
 import io
 import psutil
 import time
-import socket  # Import the socket module
+import socket
 from flask import Flask, jsonify, Response, make_response
 from flask_cors import CORS
 from scapy.all import sniff, ARP, IP, TCP, UDP, DNS, DNSQR, DNSRR
@@ -182,6 +182,7 @@ def get_best_interface():
     1. Active interfaces with both IPv4 and IPv6 addresses.
     2. Active interfaces with an IPv4 address and no IPv6 address.
     3. Active interfaces with an IPv6 address and no IPv4 address.
+    Loopback interfaces are excluded from consideration.
     """
     interfaces = psutil.net_if_addrs()
     active_interfaces = psutil.net_if_stats()
@@ -192,6 +193,10 @@ def get_best_interface():
     ipv6_only = None
 
     for interface, addrs in interfaces.items():
+        # Skip loopback interfaces
+        if interface == 'lo' or interface.startswith('lo'):
+            continue
+        
         if active_interfaces[interface].isup:
             has_ipv4 = False
             has_ipv6 = False
