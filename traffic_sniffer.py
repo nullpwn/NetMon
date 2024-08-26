@@ -8,6 +8,7 @@ import socket
 from flask import Flask, jsonify, Response, make_response
 from flask_cors import CORS
 from scapy.all import sniff, ARP, IP, IPv6, TCP, UDP, DNS, DNSQR, DNSRR
+import pyshark
 import argparse
 
 # Flask app initialization
@@ -33,7 +34,9 @@ PROTOCOLS = {
 APPLICATION_PROTOCOLS = {
     (5353, "UDP"): "mDNS",
     (80, "TCP"): "HTTP",
-    (443, "TCP"): "HTTPS"
+    (443, "TCP"): "HTTPS",
+    (53, "UDP"): "DNS",
+    (53, "TCP"): "DNS"
 }
 
 # Logging configuration
