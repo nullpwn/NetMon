@@ -7,7 +7,7 @@ import time
 import socket
 from flask import Flask, jsonify, Response, make_response
 from flask_cors import CORS
-from scapy.all import sniff, ARP, IP, TCP, UDP, DNS, DNSQR, DNSRR
+from scapy.all import sniff, ARP, IP, IPv6, TCP, UDP, DNS, DNSQR, DNSRR
 import argparse
 
 # Flask app initialization
@@ -83,11 +83,18 @@ def process_arp_packet(pkt):
 
 def process_ip_packet(pkt):
     """
-    Processes IP packets and returns a dictionary containing packet details.
+    Processes IP (both IPv4 and IPv6) packets and returns a dictionary containing packet details.
     """
-    ip_src = pkt[IP].src
-    ip_dst = pkt[IP].dst
-    protocol = pkt[IP].proto
+    ip_src = ip_dst = protocol = None
+
+    if IP in pkt:
+        ip_src = pkt[IP].src
+        ip_dst = pkt[IP].dst
+        protocol = pkt[IP].proto
+    elif IPv6 in pkt:
+        ip_src = pkt[IPv6].src
+        ip_dst = pkt[IPv6].dst
+        protocol = pkt[IPv6].nh  # Next header field in IPv6 serves a similar purpose to the protocol field in IPv4
 
     src_port, dst_port, layer, info = None, None, None, []
 
@@ -164,10 +171,10 @@ def packet_callback(pkt):
     try:
         if ARP in pkt:
             packet_info = process_arp_packet(pkt)
-        elif IP in pkt:
+        elif IP in pkt or IPv6 in pkt:
             packet_info = process_ip_packet(pkt)
         else:
-            return  # Skip packets that aren't IP or ARP
+            return  # Skip packets that aren't IP, IPv6, or ARP
 
         # Thread-safe addition to TRAFFIC_DATA
         with DATA_LOCK:

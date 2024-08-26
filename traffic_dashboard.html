@@ -237,7 +237,16 @@
             padding: 20px;
             border: 1px solid #888;
             width: 80%;
+            max-width: 600px; /* Set a maximum width */
             box-shadow: 0px 8px 16px rgba(0, 0, 0, 0.2);
+            overflow-x: auto; /* Allow horizontal scrolling if needed */
+            word-wrap: break-word; /* Ensure long text wraps properly */
+        }
+
+        #packetDetails {
+            white-space: pre-wrap; /* Maintain whitespace formatting and allow wrapping */
+            max-height: 400px; /* Limit the height to keep content within the viewport */
+            overflow-y: auto; /* Add vertical scroll if content exceeds the height */
         }
 
         .close {
