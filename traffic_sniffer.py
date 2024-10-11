@@ -8,6 +8,7 @@ import socket
 from flask import Flask, jsonify, Response, make_response
 from flask_cors import CORS
 from scapy.all import sniff, ARP, IP, IPv6, TCP, UDP, DNS, DNSQR, DNSRR
+import pyshark
 import argparse
 
 # Flask app initialization
